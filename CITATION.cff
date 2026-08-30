@@ -1,0 +1,17 @@
+cff-version: 1.2.0
+message: "If you use this work, please cite it as below."
+title: "airan-neocloud-resiliency: Monte Carlo resilience of the AI-RAN last mile"
+authors:
+  - family-names: Nanyonga
+    given-names: Margaret
+date-released: 2026-08-29
+version: 1.0.0
+license: MIT
+repository-code: "https://github.com/dimaggi-ai/airan-neocloud-resiliency"
+keywords:
+  - AI-RAN
+  - resilience
+  - availability
+  - LEO satellite
+  - edge computing
+  - Monte Carlo
