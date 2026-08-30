@@ -17,6 +17,12 @@ class TestIntervals(unittest.TestCase):
                          [(0, 3), (8755, HOURS)])
         self.assertEqual(merge([(4, 4), (7, 6)]), [])
 
+    def test_merge_clips_before_filtering(self):
+        # An event starting past year-end must vanish entirely -- not
+        # survive as a zero-length interval at the year boundary.
+        self.assertEqual(merge([(9000.0, 9010.0)]), [])
+        self.assertEqual(merge([(-10.0, 9000.0)]), [(0.0, HOURS)])
+
     def test_intersect(self):
         a = [(0, 10), (20, 30)]
         b = [(5, 25)]

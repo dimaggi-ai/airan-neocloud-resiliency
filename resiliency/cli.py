@@ -85,7 +85,7 @@ def main(argv=None) -> int:
     sub.add_parser("transports", help="failure catalog")
 
     for s in (lad, pol):
-        s.add_argument("--years", type=int, default=1000)
+        s.add_argument("--years", type=int, default=2000)
         s.add_argument("--seed", type=int, default=7)
 
     args = ap.parse_args(argv)

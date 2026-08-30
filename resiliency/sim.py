@@ -12,11 +12,16 @@ actually bounds the last mile, exactly as the FCC's disaster reports
 describe (REFERENCES.md).
 
 Semantics per resilience class (see classes.py):
-  R0 down  = site dark  OR timing lost  OR all fronthaul-grade links down
-  R1 down  = site dark  OR all R1-eligible links down
+  R0 down  = site dark  OR timing lost  OR all fronthaul-grade links
+             down -- where 'down' for R0 includes degraded links: a
+             rain-faded E-band at 25% capacity cannot carry fronthaul.
+  R1 down  = site dark  OR all R1-eligible links down (hard outages)
   R2 down  = site dark  OR (all R2-eligible links down, unless the policy
              provisions local autonomy -- then those hours run degraded
              at the class's retention factor instead of down)
+  R2 retention additionally charges partial-capacity hours: losing one
+  link of a bond, or a rain fade, costs capacity-share x lost-fraction
+  even while the class stays 'available'.
 """
 
 import random
@@ -35,7 +40,10 @@ Interval = tuple[float, float]
 
 def merge(intervals: list[Interval]) -> list[Interval]:
     """Sorted union of intervals, clipped to the year."""
-    clipped = [(max(0.0, a), min(HOURS, b)) for a, b in intervals if b > a]
+    # Clip FIRST, then drop empties: an event starting past year-end
+    # must vanish, not survive as a zero-length interval.
+    clipped = [(max(0.0, a), min(HOURS, b)) for a, b in intervals]
+    clipped = [(a, b) for a, b in clipped if b > a]
     if not clipped:
         return []
     clipped.sort()
@@ -102,7 +110,10 @@ class ClassResult:
     nines: float
     ettr_h: float                   # mean restore time per down episode
     episodes_per_year: float
-    retention: float                # usable-capacity fraction (R2 autonomy)
+    # Usable-capacity fraction: charges full-down hours, degraded
+    # local-autonomy hours (at 1 - degraded_retention), and -- for
+    # capacity-weighted classes -- partial-capacity hours on the bond.
+    retention: float
 
 
 @dataclass
@@ -137,33 +148,52 @@ def _in_storm(t: float, storms: list[Interval]) -> bool:
     return any(a <= t < b for a, b in storms)
 
 
+@dataclass
+class TransportYear:
+    """One transport-instance-year of failure intervals (all merged)."""
+    hard: list                      # hard outages (capacity_factor == 0)
+    soft: list                      # [(capacity_factor, intervals)] per
+                                    # degraded mode
+    cuts: list                      # physical-plant severances only --
+                                    # the SRLG-shareable subset of hard
+
+
 def _transport_year(rng, t: Transport, storms: list[Interval],
                     grid_down: list[Interval],
-                    neighbor_battery_h: float) -> tuple[list, list]:
-    """(hard-down intervals, degraded intervals) for one transport-year."""
-    hard, soft = [], []
+                    neighbor_battery_h: float) -> TransportYear:
+    hard, soft, cuts = [], [], []
     storm_hours = total(storms)
     for m in t.modes:
         starts = _poisson_starts(rng, m.rate_per_year)
-        # Extra storm-window arrivals for weather-boosted modes.
+        # Extra storm-window arrivals for weather-boosted modes; pick
+        # the storm weighted by its duration (a 40 h storm attracts
+        # arrivals over 40 hours, not one share).
         if m.storm_rate_mult > 1.0 and storm_hours > 0:
             extra = m.rate_per_year * (m.storm_rate_mult - 1.0) \
                 * storm_hours / HOURS
+            durations = [b - a for a, b in storms]
             for _ in range(_poisson(rng, extra)):
-                a, b = storms[rng.randrange(len(storms))]
-                starts.append(rng.uniform(a, min(b, HOURS)))
+                a, b = rng.choices(storms, weights=durations)[0]
+                starts.append(rng.uniform(a, b))
+        events = []
         for s in starts:
             mttr = m.mttr_h
             if m.storm_mttr_mult > 1.0 and _in_storm(s, storms):
                 mttr *= m.storm_mttr_mult
             d = rng.expovariate(1.0 / mttr)
-            (hard if m.capacity_factor == 0.0 else soft).append((s, s + d))
+            events.append((s, s + d))
+        if m.capacity_factor == 0.0:
+            hard += events
+            if m.physical_cut:
+                cuts += events
+        elif events:
+            soft.append((m.capacity_factor, merge(events)))
     if t.grid_dependent:
         # The neighboring macro rides its own battery, then goes dark.
         for a, b in grid_down:
             if b - a > neighbor_battery_h:
                 hard.append((a + neighbor_battery_h, b))
-    return merge(hard), merge(soft)
+    return TransportYear(merge(hard), soft, merge(cuts))
 
 
 def _grid_year(rng, storms: list[Interval], storm: StormConfig,
@@ -204,15 +234,30 @@ def _policy_transports(p: Policy) -> list[tuple[str, Transport]]:
     out = [(n, transport(n)) for n in p.transports]
     if p.dual_fiber:
         out.append(("fiber-b", transport("fiber")))
+    names = [n for n, _ in out]
+    if len(names) != len(set(names)):
+        raise ValueError(
+            f"duplicate transport instance in {names!r}: for a second "
+            "fiber use dual_fiber=True; otherwise register a renamed "
+            "custom() transport in the CATALOG")
     return out
 
 
-def simulate(p: Policy, years: int = 1000, seed: int = 7,
+def _class_down(c: ResilienceClass, ty: TransportYear) -> list[Interval]:
+    """Intervals during which this transport cannot carry class c."""
+    if c.needs_full_capacity:
+        return merge(ty.hard + [iv for _cf, ivs in ty.soft for iv in ivs])
+    return ty.hard
+
+
+def simulate(p: Policy, years: int = 2000, seed: int = 7,
              storm: StormConfig = StormConfig()) -> Result:
     rng = random.Random(seed)
     res = Result(p.name, p.label, years, round(p.monthly_usd(), 0))
-    acc = {c.name: {"down": 0.0, "episodes": 0, "ep_h": 0.0, "deg": 0.0}
+    acc = {c.name: {"down": 0.0, "episodes": 0, "ep_h": 0.0, "deg": 0.0,
+                    "caploss": 0.0}
            for c in CLASSES}
+    pt = _policy_transports(p)
 
     for _ in range(years):
         storms = merge([(s, s + rng.expovariate(1.0 / storm.mean_duration_h))
@@ -223,23 +268,32 @@ def simulate(p: Policy, years: int = 1000, seed: int = 7,
         site_dark = _site_dark(rng, grid_down, p.power)
         timing_down = _timing_down(rng, p.timing)
 
-        downs: dict[str, list[Interval]] = {}
-        for iname, t in _policy_transports(p):
-            hard, _soft = _transport_year(rng, t, storms, grid_down,
-                                          storm.neighbor_battery_h)
-            downs[iname] = hard
-        # SRLG: a share of primary-fiber cuts also severs the diverse path.
-        if p.dual_fiber and downs.get("fiber"):
-            shared = [iv for iv in downs["fiber"]
+        tyears: dict[str, TransportYear] = {}
+        for iname, t in pt:
+            tyears[iname] = _transport_year(rng, t, storms, grid_down,
+                                            storm.neighbor_battery_h)
+        # SRLG: a share of primary-fiber physical CUTS also severs the
+        # 'diverse' path (shared duct/bridge/backhoe). Upstream and
+        # equipment events are not shared -- the paths are diverse
+        # everywhere except in the ground.
+        if p.dual_fiber and tyears["fiber"].cuts:
+            shared = [iv for iv in tyears["fiber"].cuts
                       if rng.random() < p.shared_cut_fraction]
-            downs["fiber-b"] = merge(downs["fiber-b"] + shared)
+            if shared:
+                tb = tyears["fiber-b"]
+                tb.hard = merge(tb.hard + shared)
+                tb.cuts = merge(tb.cuts + shared)
 
         for c in CLASSES:
-            eligible = [iname for iname, t in _policy_transports(p)
+            eligible = [(iname, t) for iname, t in pt
                         if c.name in t.carries]
-            all_down = downs[eligible[0]]
-            for iname in eligible[1:]:
-                all_down = intersect(all_down, downs[iname])
+            if eligible:
+                all_down = _class_down(c, tyears[eligible[0][0]])
+                for iname, _t in eligible[1:]:
+                    all_down = intersect(all_down,
+                                         _class_down(c, tyears[iname]))
+            else:
+                all_down = [(0.0, HOURS)]   # no eligible link, ever
             down = list(site_dark)
             if c.needs_timing:
                 down += timing_down
@@ -255,14 +309,30 @@ def simulate(p: Policy, years: int = 1000, seed: int = 7,
             a["episodes"] += len(down)
             a["ep_h"] += total(down)
             a["deg"] += total(partition_degraded)
+            # Partial-capacity hours: losing one link of the bond, or a
+            # rain fade, charged by capacity share -- but never during
+            # hours already charged as down or degraded-autonomy.
+            if c.capacity_weighted and eligible:
+                cap_total = sum(t.capacity_gbps for _i, t in eligible)
+                exclude = merge(down + partition_degraded)
+                for iname, t in eligible:
+                    ty = tyears[iname]
+                    share = t.capacity_gbps / cap_total
+                    a["caploss"] += share * total(
+                        subtract(ty.hard, exclude))
+                    for cf, ivs in ty.soft:
+                        live = subtract(subtract(ivs, ty.hard), exclude)
+                        a["caploss"] += share * (1.0 - cf) * total(live)
 
     for c in CLASSES:
         a = acc[c.name]
         down_yr = a["down"] / years
         avail = 1.0 - down_yr / HOURS
         deg_yr = a["deg"] / years
+        cap_yr = a["caploss"] / years
         retention = 1.0 - (down_yr
-                           + (1.0 - c.degraded_retention) * deg_yr) / HOURS
+                           + (1.0 - c.degraded_retention) * deg_yr
+                           + cap_yr) / HOURS
         res.classes[c.name] = ClassResult(
             name=c.name,
             downtime_h_yr=round(down_yr, 2),
@@ -283,6 +353,6 @@ def _nines(avail: float) -> float:
     return -math.log10(1.0 - avail)
 
 
-def ladder(policies, years: int = 1000, seed: int = 7,
+def ladder(policies, years: int = 2000, seed: int = 7,
            storm: StormConfig = StormConfig()) -> list[Result]:
     return [simulate(p, years, seed, storm) for p in policies]

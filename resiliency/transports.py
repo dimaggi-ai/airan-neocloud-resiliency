@@ -2,7 +2,9 @@
 
 Each transport is defined by capacity, latency, cost, which resilience
 classes it may carry, and a set of failure modes (rate + mean restore
-time). Every number traces to REFERENCES.md; every number is overridable.
+time). Every number either traces to REFERENCES.md or is explicitly
+labeled a planning assumption in the comments below; every number is
+overridable.
 
 Eligibility encodes hard physics, not preference:
   R0 (hard-real-time radio / fronthaul + PTP timing) rides only fiber or
@@ -25,6 +27,10 @@ class FailureMode:
                                   # (0.0 = hard outage; 0.25 = rain fade)
     storm_rate_mult: float = 1.0  # arrival-rate multiplier inside a storm
     storm_mttr_mult: float = 1.0  # restore-time multiplier inside a storm
+    # Physical severance of the outside plant (backhoe, bridge, pole).
+    # Only these events are candidates for SRLG sharing between
+    # 'diverse' fiber paths -- an upstream router reboot is not.
+    physical_cut: bool = False
 
 
 @dataclass(frozen=True)
@@ -37,11 +43,6 @@ class Transport:
     modes: tuple[FailureMode, ...]
     monthly_usd: float
     grid_dependent: bool = False  # dies with the local grid (no own backup)
-
-    def hard_downtime_h(self) -> float:
-        """Expected standalone hard-outage hours/year (no storms)."""
-        return sum(m.rate_per_year * m.mttr_h for m in self.modes
-                   if m.capacity_factor == 0.0)
 
 
 # --- catalog (defaults; see REFERENCES.md for each calibration) -------------
@@ -57,7 +58,7 @@ FIBER_ACCESS = Transport(
         # Buried-fiber repair is a civil-works truck roll; crews saturate
         # in storms.
         FailureMode("cut", rate_per_year=0.08, mttr_h=8.0,
-                    storm_mttr_mult=3.0),
+                    storm_mttr_mult=3.0, physical_cut=True),
         # Everything else on a single-homed circuit: upstream equipment,
         # power at the serving CO, maintenance. Calibrated so a single
         # unprotected access lands at/below its 99.9% SLA floor.
@@ -73,9 +74,14 @@ MICROWAVE_EBAND = Transport(
     rtt_ms=0.3,
     carries=("R0", "R1", "R2"),
     modes=(
+        # Planning assumption: no public per-link hardware-failure stat
+        # for E-band; 0.5/yr x 4 h is a conservative radio/IDU figure.
         FailureMode("hardware", rate_per_year=0.5, mttr_h=4.0),
         # Rain on an E-band link mostly degrades (adaptive modulation),
-        # rather than drops; storms multiply the fade rate.
+        # rather than drops; storms multiply the fade rate. The
+        # degrade-not-drop behavior and fade physics are sourced; the
+        # 40/yr event count is a planning assumption for a temperate
+        # climate at these path lengths.
         FailureMode("rain-fade", rate_per_year=40.0, mttr_h=0.3,
                     capacity_factor=0.25, storm_rate_mult=3.0),
     ),
@@ -89,6 +95,9 @@ FWA_5G = Transport(
     rtt_ms=25.0,
     carries=("R1", "R2"),
     modes=(
+        # Planning assumption: ~monthly one-hour outages for a
+        # best-effort consumer-grade cellular service (congestion,
+        # sector work, core incidents) -- no public per-CPE stat.
         FailureMode("outage", rate_per_year=12.0, mttr_h=1.0),
     ),
     monthly_usd=150.0,
@@ -104,10 +113,14 @@ LEO_SAT = Transport(
     rtt_ms=50.0,
     carries=("R1", "R2"),
     modes=(
-        # Short interruptions aligned to the constellation's 15-s
-        # reconfiguration cadence; heavy-tailed durations. Modeled as
-        # frequent ~1-minute flaps.
+        # Aggregated abstraction: measurement studies see ~15k brief
+        # interruptions/yr (87% under 2 s, max ~31 s), aligned to the
+        # constellation's 15-s reconfiguration cadence. We aggregate to
+        # 200/yr x ~72 s flaps, preserving approximate annual downtime
+        # while keeping episode counts legible.
         FailureMode("flap", rate_per_year=200.0, mttr_h=0.02),
+        # Longer outages (weather, gateway, software): planning
+        # assumption for a service with no availability SLA.
         FailureMode("outage", rate_per_year=3.0, mttr_h=1.5),
     ),
     monthly_usd=250.0,

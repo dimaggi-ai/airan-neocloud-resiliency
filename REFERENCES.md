@@ -1,8 +1,9 @@
 # References
 
-Every calibration in `resiliency/` traces to an entry here; entries note
-what they pin and their vintage. Verified against the primary URLs on
-2026-08-29. Dollar figures in the policy ladder are planning-grade
+Every calibration in `resiliency/` either traces to an entry here or is
+explicitly labeled a planning assumption in the source comments; entries
+note what they pin and their vintage. Verified against the primary URLs
+on 2026-08-29. Dollar figures in the policy ladder are planning-grade
 assumptions, flagged as such in [docs/study.md](docs/study.md).
 
 ## Fiber: cut rates, repair times, single-access reality
@@ -41,19 +42,19 @@ Key modeling nuance pinned into `microwave.rain-fade`: rain mostly
 [Analog Devices, E-band radio links](https://www.analog.com/en/resources/technical-articles/e-band-wireless-radio-links.html) ·
 [Ericsson Microwave Outlook 2025](https://www.ericsson.com/en/reports-and-papers/microwave-outlook)
 
-**[4] Microwave is half the world's backhaul.** Ericsson (Oct 2025):
-global backhaul heading to a 49% microwave / 51% fiber split by 2030;
-microwave in 75% of live 5G networks; E-band now 8% of deployments. The
-fiber-first assumption behind "just get a second fiber" does not hold
-for most of the world's sites.
+**[4] Microwave: heading toward half the world's backhaul.** Ericsson
+(Oct 2025): global backhaul *projected* at a 49% microwave / 51% fiber
+split by 2030; microwave present in 75% of live 5G networks today;
+E-band now 8% of deployments. The fiber-first assumption behind "just
+get a second fiber" does not hold for most of the world's sites.
 [Ericsson Microwave Outlook 2025](https://www.ericsson.com/en/news/2025/10/microwave-outlook-2025-near-fiber-split-ai-and-2x-capacity)
 
 ## LEO satellite
 
 **[5] Starlink: official spec vs measured behavior.** Spec: 25–60 ms
 latency on land, 25–220 Mbps down / 5–20 Mbps up; **no jitter or
-availability figure published**. Measured: Ookla 2025 US median ~118
-Mbps down / ~17 up / ~45 ms; three independent studies replicate
+availability figure published**. Measured: Ookla (Q1 2025) US median
+~118 Mbps down / ~17 up / ~45 ms; three independent studies replicate
 globally synchronized **15-second path-reconfiguration intervals**
 (reallocations at seconds 12/27/42/57) causing step changes in
 latency/throughput. Pins `leo` RTT/capacity and the `flap` mode's
@@ -63,14 +64,19 @@ cadence framing.
 [Starlink one-way delay (LEO-NET '25)](https://dl.acm.org/doi/10.1145/3748749.3749090)
 
 **[6] Starlink outage distribution: frequent, short, heavy-tailed.** A
-2025 3-month measurement recorded thousands of outage events with ~80%
-probability of at least one outage in any 60-minute window; durations
-heavy-tailed; dish telemetry attributes causes (obstruction, no
-downlink ~134 s, sky search ~221 s); many short outages align to the
-15-s boundary. No study publishes a single clean availability
-percentage — the honest model is many short flaps plus rare long tails,
-which is what `leo.flap` (200/yr × ~72 s) + `leo.outage` (3/yr × 1.5 h)
-encodes.
+2023 measurement campaign (published WWW '24) recorded ~15,000 brief
+interruptions per year-equivalent — 87% under 2 s, longest ~31 s —
+many aligned to the 15-s reconfiguration boundary. A 2025 3-month
+study measured ~80% probability of at least one outage in any
+60-minute window, durations heavy-tailed; a 2025 study of *mobile*
+(in-motion) terminals uses dish telemetry to attribute causes
+(obstruction; no-downlink ~134 s; sky-search ~221 s) — in-motion
+figures, worse than a fixed edge site would see. No study publishes a
+single clean availability percentage. `leo.flap` (200/yr × ~72 s) is
+therefore an aggregated abstraction that preserves the measured
+distributions' approximate annual downtime while keeping episode
+counts legible; `leo.outage` (3/yr × 1.5 h) is a planning assumption
+for the long tail.
 [Robust live streaming over LEO (2025)](https://arxiv.org/pdf/2508.13402) ·
 [First look at Starlink performance (IMC '22)](https://dl.acm.org/doi/10.1145/3517745.3561416) ·
 [Starlink vs 5G reliability (2025)](https://arxiv.org/pdf/2512.19639)
@@ -125,10 +131,12 @@ process (`StormConfig`) and `grid_outage_p=0.7`.
 [FCC DIRS, Ida](https://docs.fcc.gov/public/attachments/DOC-375318A1.pdf)
 
 **[11] Battery and generator envelopes.** Typical cell-site batteries
-last 2–8 h (industry practice; regulatory expectations for critical
-sites 8–24 h); ~78% of macro sites carry permanent generators with
-72–120 h per fuel tank (CA post-PSPS commitments). Pins
-`PowerConfig(battery_h, generator_fuel_h)` and the P4 generator rung.
+bridge ~4–8 h (industry practice; the FCC's vacated 2007 order would
+have required 8 h at cell sites and 24 h at COs — see [10]); ~78% of
+macro sites carry permanent generators with 72–120 h per fuel tank (CA
+post-PSPS commitments). Pins `PowerConfig(battery_h, generator_fuel_h)`
+and the P4 generator rung; the 6% generator start-failure probability
+is a planning assumption (industry rule of thumb), not sourced here.
 [FCC 21-99](https://docs.fcc.gov/public/attachments/FCC-21-99A1.pdf) ·
 [Wireless Estimator, Helene analysis](https://wirelessestimator.com/articles/2024/unprecedented-outage-no-hurricane-has-knocked-out-more-cell-sites-than-category-4-helene/)
 

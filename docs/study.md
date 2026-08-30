@@ -1,8 +1,10 @@
 # Carrier-grade resiliency for the AI-RAN last mile: a blueprint and its price
 
-Reference numbers point to [REFERENCES.md](../REFERENCES.md). Every
-availability figure reproduces with
-`python3 -m resiliency.cli ladder --years 2000` (seed 7); figures with
+Reference numbers point to [REFERENCES.md](../REFERENCES.md). The
+headline table reproduces with
+`python3 -m resiliency.cli ladder --years 20000` (seed 7); the CLI
+default of 2,000 years gives the same numbers to within Monte Carlo
+noise (see the skeptic section for the seed spread); figures with
 `python3 run.py`.
 
 ## The question
@@ -77,65 +79,90 @@ The simulator (`resiliency/sim.py`) injects, per simulated year:
 
 - **Fiber cuts** at planning rates (13/1,000 route-mi-yr metro, ~10 km
   route) with 8 h repairs, plus upstream/equipment events calibrated so
-  a single-homed access lands at its measured ~99.9% floor [1, 2].
+  a single-homed access lands at its ~99.9% SLA floor [1, 2] — the
+  standalone circuit simulates at 99.91% (7.8 h/yr).
 - **Microwave rain fades** that *degrade* rather than drop (adaptive
-  modulation [3]), tripled in storms; rare hardware failures.
-- **LEO flaps**: ~200/yr short interruptions (the measured 15-s
-  reconfiguration cadence and heavy-tailed outage record [5, 6]) plus
-  rare longer outages. Bonded policies absorb flaps by packet
-  duplication — which is what shipping bonders do [8].
+  modulation [3]; the 40/yr event rate is a planning assumption),
+  tripled in storms; rare hardware failures. A fade counts as *down*
+  for fronthaul-grade R0 — 25% of an E-band link is not a fronthaul —
+  and as a capacity-share loss for tenant R2.
+- **LEO flaps**: ~200/yr short interruptions — an aggregation of the
+  measured ~15,000 mostly-sub-2-second events/yr aligned to the 15-s
+  reconfiguration cadence, preserving approximate annual downtime
+  [5, 6] — plus rare longer outages. Bonded policies absorb flaps by
+  packet duplication — which is what shipping bonders do [8].
 - **Grid outages**: EIA routine baseline plus storm-driven multi-hour
-  events [12]; batteries bridge 2–8 h; generators (when bought) run
-  96 h per tank with a 6% start-failure probability [10, 11].
+  events [12]; batteries bridge 4–8 h; generators (when bought) run
+  96 h per tank [10, 11] with an assumed 6% per-event start-failure
+  probability (an industry rule of thumb, not a sourced statistic).
 - **Storms** as the correlation engine: grid down with p=0.7, fiber
   repair crews saturated (MTTR ×3), rain-fade rate ×3, the neighboring
   macro carrying 5G FWA dark after its own 4 h battery [10]. This is
   the model's spine — the FCC's disaster record says power, not
-  transport, is the dominant cause [10].
-- **GNSS loss**: 0.5 events/yr × 8 h mean (jamming grew 67% last year
-  [13]); OCXO holds the ±1.5 µs budget ~6 h, rubidium ~36 h.
+  transport, is the dominant cause [10], and the storm process is
+  calibrated to reflect it.
+- **GNSS loss**: 0.5 events/yr × 8 h mean (a planning assumption;
+  jamming grew 67% last year [13]); OCXO holds the ±1.5 µs budget
+  ~6 h, rubidium ~36 h.
+- **SRLG on "diverse" fiber**: 15% of physical *cuts* (and only cuts —
+  upstream equipment events stay independent) hit both paths anyway:
+  shared duct, same bridge crossing, same backhoe. The fraction is a
+  planning assumption; audit your own duct maps.
 
-## Deliverable 4 — what the ladder buys (2,000 simulated years)
+## Deliverable 4 — what the ladder buys (20,000 simulated years)
 
-| policy | $/mo | R0 | R1 | R2 | binding constraint |
-|---|---|---|---|---|---|
-| P0 single fiber, 2 h battery | 1,580 | 99.767% | 99.787% | 99.787% | everything |
-| P1 dual diverse fiber, 4 h | 3,160 | 99.868% | 99.889% | 99.889% | power + SRLG |
-| P2 fiber + E-band, 4 h | 2,460 | 99.873% | 99.895% | 99.895% | power |
-| P3 fiber + 5G + LEO, 4 h | 2,060 | 99.786% | 99.897% | 99.897% | power |
-| P4 all + generator + Rb + autonomy | 3,780 | 99.993% | 99.993% | 99.993% | long-tail storms |
+| policy | $/mo | R0 | R1 | R2 | R2 retention | binding constraint |
+|---|---|---|---|---|---|---|
+| P0 single fiber, 4 h battery | 1,660 | 99.779% | 99.800% | 99.800% | 99.80% | everything |
+| P1 dual diverse fiber | 3,160 | 99.871% | 99.892% | 99.892% | 99.80% | power + SRLG |
+| P2 fiber + E-band | 2,460 | 99.874% | 99.895% | 99.895% | 99.79% | power |
+| P3 fiber + 5G + LEO | 2,060 | 99.786% | 99.897% | 99.897% | 99.81% | power |
+| P4 all + generator + Rb + autonomy | 3,780 | 99.993% | 99.994% | 99.994% | 99.88% | long-tail storms |
+
+The ladder isolates one investment per rung: battery is held at 4 h
+and the clock at OCXO until P4, so each row's delta is attributable to
+the thing it names. *R2 retention* is usable capacity, not uptime — it
+additionally charges degraded-autonomy hours and partial-capacity hours
+(a rain fade, one lost link of a bond) by capacity share.
 
 ![Availability ladder](../figures/availability_ladder.png)
 
-Six findings, each an invariant in `tests/test_invariants.py`:
+Seven findings, the load-bearing ones invariants in
+`tests/test_invariants.py`:
 
-**1. The single-fiber edge site is a ~2.7-nines site.** Nineteen hours a
-year of R2 downtime — half transport, half power. Any "carrier-grade
-edge AI" claim built on P0 is marketing.
+**1. The single-fiber edge site is a ~2.7-nines site.** Seventeen and a
+half hours a year of R2 downtime (19 for R0) — roughly half transport,
+half power. Any "carrier-grade edge AI" claim built on P0 is marketing.
 
 **2. Bonding is the cheapest rung and it works — for R1/R2 only.** P3
-adds 5G + LEO for $480/month and takes R1/R2 connectivity losses to
-almost zero (the downtime-split figure shows P3's R2 bar is *pure
-power*). But P3's R0 equals P0's R0 to within noise: **the fronthaul
-cannot ride the bonded paths**, so the class that justifies the site
-gains nothing. Bonding is a tenant-continuity tool, not a radio-
-continuity tool.
+adds 5G + LEO for $400/month and takes R1/R2 connectivity losses to
+almost zero (the downtime-split figure shows P3's R2 bar is essentially
+*pure power*) — matching the $1,500 second fiber's availability. But
+P3's R0 equals P0's R0 to within noise: **the fronthaul cannot ride the
+bonded paths**, so the class that justifies the site gains nothing.
+Bonding is a tenant-continuity tool, not a radio-continuity tool.
 
 ![Downtime split](../figures/downtime_split.png)
 
 **3. You cannot bond your way out of a power outage.** All transport
 diversity combined (P0→P3) buys ~0.3 nines of R2; the generator rung
-buys ~1.2 more. After P3, the site's availability *is* its power chain:
-the FCC's disaster finding [10], reproduced in simulation. The order of
-investment the industry's own pitch implies — more links first — is
-backwards; the generator comes first.
+buys ~1.2 more. Every transport rung — P1, P2, P3, at $1,500, $800,
+and $400 — converges on the same ~99.89–99.90% wall, because after the
+links are diverse the site's availability *is* its power chain. That is
+consistent with the FCC's disaster finding [10], which the storm
+process was calibrated to reflect. The order of investment the
+industry's own pitch implies — more links first — is backwards; the
+generator comes first.
 
-**4. Microwave beats a second fiber, at $700/month less.** P2 edges P1
-on every class: the diverse fiber pays the SRLG tax (15% of cuts hit
-the "diverse" path's shared duct or bridge crossing), while E-band
-fails in a genuinely independent mode (rain, which mostly degrades, not
-drops [3]). Where trenching is expensive, this ordering is decisive —
-and half the world's sites already backhaul over microwave [4].
+**4. Microwave matches a second fiber, at $700/month less.** P2 and P1
+land within simulation noise of each other on every class — so the
+choice is decided by price and failure independence, and both favor
+E-band: the diverse fiber pays the SRLG tax (a planning-assumption 15%
+of physical cuts hit the "diverse" path's shared duct or bridge
+crossing), while E-band fails in a genuinely independent mode (rain,
+which mostly degrades, not drops [3]). Where trenching is expensive,
+this ordering is decisive — and microwave already carries a large share
+of the world's backhaul [4].
 
 **5. Timing is R0's hidden tail, and rubidium closes it.** With OCXO
 holdover, GNSS events beyond ~6 h put R0 down even when every link and
@@ -153,10 +180,20 @@ cost is small and its failure mode ("site keeps serving cached models
 at 60% capacity") is the difference between an outage and an incident —
 but the honest accounting is that it is the last rung, not the first.
 
+**7. Availability is not usable capacity.** No transport rung moves R2
+retention off ~99.8%: bonding keeps the site *reachable*, but the
+0.45 Gbps of 5G + LEO is ~4% of the fiber's capacity, rain fades shave
+the E-band bond, and every hard failure of one link costs its capacity
+share even while the class stays "up". Even P4 reaches only ~99.88%
+retention against 99.994% availability. A tenant SLA written in
+availability nines and a capacity promise written in Gbps are different
+products — the neocloud series' `usable = nominal × …` discipline,
+applied to the last mile.
+
 **The playbook, in one sentence:** classify flows (R0/R1/R2), bond the
 last mile for the tenant classes, buy the generator and the rubidium
 clock before the third transport, and reserve local autonomy for the
-tail — priced here at $2,200/month for ~1.5 additional nines.
+tail — priced here at $2,120/month for ~1.5 additional nines.
 
 ## What a skeptic should attack
 
@@ -174,16 +211,24 @@ tail — priced here at $2,200/month for ~1.5 additional nines.
   logistics for refueling — the model's generator gets one tank, no
   refuel). All omissions flatter the *transport* rungs, not the
   generator rung, so finding 3 survives its own critique.
-- **Flap absorption is assumed, not simulated.** P3/P4 treat LEO flaps
-  as absorbed by bonding (WAN smoothing/duplication [8]). Standalone
-  LEO would be ~99.4% at best. If your bonder does failover rather
-  than duplication, add seconds-scale hits per flap.
+- **Flap absorption is assumed, not simulated.** When another bonded
+  path is up, P3/P4 treat LEO flaps as absorbed (WAN
+  smoothing/duplication [8] — what shipping bonders do). Standalone
+  LEO simulates at ~99.90% (8.5 h/yr, dominated by the flap
+  aggregate). If your bonder does failover rather than duplication,
+  add seconds-scale hits per flap.
+- **Monte Carlo precision.** The headline table is one 20,000-year run
+  (seed 7). Across ten seeds at 2,000 years, P4's R2 downtime spans
+  0.49–0.70 h/yr — a ±0.001-percentage-point spread on availability —
+  which is why P4 is quoted as ~99.994% and the last digit should not
+  be read as significant. P0's spread is ±0.7 h/yr on ~17.5.
 - **Costs are planning-grade** [20]. They set the ordering of the cost
   axis; procurement will move the numbers, and P1 vs P2 ($3,160 vs
   $2,460) is the comparison most sensitive to local trenching reality.
 - **The 60% degraded-retention figure** for local autonomy is a design
-  target (cached models, local RAG index), not a measurement. Nothing
-  else in the results depends on it.
+  target (cached models, local RAG index), not a measurement. Finding
+  7's retention numbers charge degraded hours at this figure; nothing
+  else depends on it.
 
 ## What this study does not claim
 

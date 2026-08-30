@@ -20,8 +20,10 @@ class Policy:
     power: PowerConfig
     timing: TimingConfig
     dual_fiber: bool = False
-    # Fraction of fiber cuts that hit both 'diverse' paths anyway (shared
-    # duct, same bridge crossing, same backhoe): the SRLG tax.
+    # Fraction of physical fiber CUTS (not upstream/equipment events)
+    # that hit both 'diverse' paths anyway (shared duct, same bridge
+    # crossing, same backhoe): the SRLG tax. Planning assumption --
+    # audit your own duct maps.
     shared_cut_fraction: float = 0.15
     # Degraded local serving during WAN partition (cached models, local
     # RAG index, store-and-forward telemetry).
@@ -41,7 +43,9 @@ class Policy:
 P0 = Policy(
     name="P0", label="single fiber",
     transports=("fiber",),
-    power=PowerConfig(battery_h=2.0),
+    # Battery is held at 4 h across P0-P3 so each rung isolates ONE
+    # investment; only P4 changes the power chain.
+    power=PowerConfig(battery_h=4.0),
     timing=TimingConfig(holdover="ocxo"),
 )
 

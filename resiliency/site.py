@@ -18,7 +18,10 @@ class PowerConfig:
     battery_h: float = 4.0          # bridge before the site goes dark
     has_generator: bool = False
     generator_fuel_h: float = 96.0  # runtime per fuel tank
-    generator_start_fail_p: float = 0.06  # per-event start failure
+    # Planning assumption: standby gensets fail to start a few percent
+    # of the time (industry rule of thumb, no single public per-event
+    # stat for telecom sites).
+    generator_start_fail_p: float = 0.06
     # Grid inputs (EIA SAIDI split): routine interruptions plus
     # major-event tails that arrive with storms.
     routine_outages_per_year: float = 1.5
@@ -28,6 +31,9 @@ class PowerConfig:
 @dataclass(frozen=True)
 class TimingConfig:
     holdover: str = "ocxo"          # 'ocxo' | 'rubidium'
+    # Planning assumption: rare long GNSS denial events (jamming,
+    # spoofing, receiver faults). Sourced facts are the +/-1.5 us phase
+    # budget and the holdover classes below; the event rate is not.
     gnss_events_per_year: float = 0.5
     gnss_event_h: float = 8.0
 

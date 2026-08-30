@@ -92,11 +92,72 @@ class TestFindings(unittest.TestCase):
         self.assertGreater(with_ocxo.classes["R0"].downtime_h_yr,
                            with_rb.classes["R0"].downtime_h_yr)
 
-    def test_autonomy_keeps_r2_retention_above_availability_floor(self):
-        # Wherever partitions do occur under P4, retention >= availability
-        # (degraded serving counts partially).
-        r2 = BY_NAME["P4"].classes["R2"]
-        self.assertGreaterEqual(r2.retention, r2.availability - 1e-9)
+    def test_autonomy_converts_partitions_into_degraded_serving(self):
+        # On a partition-heavy single-transport site, autonomy must lift
+        # both availability (partitions no longer count as down) and
+        # retention (degraded serving keeps 60%) -- and retention still
+        # trails availability, because degraded hours cost 40%.
+        from resiliency.policies import Policy
+        from resiliency.site import PowerConfig, TimingConfig
+        frag_on = Policy(name="FA", label="leo only + autonomy",
+                         transports=("leo",), power=PowerConfig(),
+                         timing=TimingConfig(), local_autonomy=True)
+        frag_off = Policy(name="FB", label="leo only",
+                          transports=("leo",), power=PowerConfig(),
+                          timing=TimingConfig())
+        on = simulate(frag_on, years=50, seed=11).classes["R2"]
+        off = simulate(frag_off, years=50, seed=11).classes["R2"]
+        self.assertGreater(on.availability, off.availability)
+        self.assertGreater(on.retention, off.retention)
+        self.assertLessEqual(on.retention, on.availability + 1e-9)
+
+    def test_rain_fade_downs_r0_but_only_degrades_r2(self):
+        # A microwave-only site: fades (partial capacity) count as down
+        # for fronthaul-grade R0, but only shave R2's retention.
+        from resiliency.policies import Policy
+        from resiliency.site import PowerConfig, TimingConfig
+        from resiliency.sim import StormConfig
+        p = Policy(name="MW", label="microwave only",
+                   transports=("microwave",), power=PowerConfig(),
+                   timing=TimingConfig(gnss_events_per_year=0.0))
+        r = simulate(p, years=50, seed=3,
+                     storm=StormConfig(rate_per_year=0.0))
+        self.assertGreater(r.classes["R0"].downtime_h_yr,
+                           r.classes["R2"].downtime_h_yr + 5.0)
+        r2 = r.classes["R2"]
+        self.assertLess(r2.retention, r2.availability)
+
+    def test_no_fronthaul_grade_transport_means_r0_is_never_up(self):
+        from resiliency.policies import Policy
+        from resiliency.site import PowerConfig, TimingConfig
+        p = Policy(name="LX", label="leo only", transports=("leo",),
+                   power=PowerConfig(), timing=TimingConfig())
+        r = simulate(p, years=5, seed=2)
+        self.assertEqual(r.classes["R0"].availability, 0.0)
+
+    def test_duplicate_transport_instances_are_rejected(self):
+        from resiliency.policies import Policy
+        from resiliency.site import PowerConfig, TimingConfig
+        p = Policy(name="DD", label="", transports=("fiber", "fiber"),
+                   power=PowerConfig(), timing=TimingConfig())
+        with self.assertRaises(ValueError):
+            simulate(p, years=1, seed=1)
+
+    def test_srlg_shares_only_physical_cuts(self):
+        # Paired runs (same seed, identical event stream): moving
+        # shared_cut_fraction from 0 to 1 may add at most the physical
+        # cut budget (~0.08/yr x 8 h, storm-stretched) to dual-fiber R1
+        # downtime -- NOT the dominant upstream mode (6/yr x 1.2 h),
+        # which stays diverse.
+        from dataclasses import replace
+        from resiliency.policies import P1
+        full = simulate(replace(P1, shared_cut_fraction=1.0),
+                        years=YEARS, seed=11).classes["R1"]
+        none = simulate(replace(P1, shared_cut_fraction=0.0),
+                        years=YEARS, seed=11).classes["R1"]
+        delta = full.downtime_h_yr - none.downtime_h_yr
+        self.assertGreater(delta, 0.1)   # cuts genuinely shared
+        self.assertLess(delta, 3.0)      # ...but ONLY cuts
 
 
 class TestCli(unittest.TestCase):
