@@ -230,6 +230,20 @@ tail — priced here at $2,120/month for ~1.5 additional nines.
   7's retention numbers charge degraded hours at this figure; nothing
   else depends on it.
 
+Findings 1–5 are re-run across eight seeds independent of this study's
+in [`validation.py`](../validation.py), at the same 2,000-year horizon
+used above, and each is stated so that it *could* fail: "within noise"
+is measured against the model's own reseeding spread rather than a
+chosen threshold, and the generator's value is an ordering rather than
+a margin. Two claims did not survive that treatment and were replaced —
+an earlier "≥1.0 nines" generator threshold, picked after seeing 1.15,
+and a rung-tie stated as a maximum rather than a mean; both held at the
+shipped seeds and failed on reseeding. The registry also prints what it
+does **not** check — the storm magnitude, the 6% generator
+start-failure rate, the 15% SRLG fraction, P4's absolute availability,
+and this 60% figure — and `tests/test_validation.py` breaks the
+simulator six ways to confirm the registry goes red when the model does.
+
 ## What this study does not claim
 
 It does not claim the last mile can reach hyperscaler-region

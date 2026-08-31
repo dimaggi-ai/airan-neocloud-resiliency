@@ -45,10 +45,66 @@ hurricane_coast = StormConfig(rate_per_year=2.5, mean_duration_h=36.0)
 simulate(P2, years=2000, storm=hurricane_coast).classes["R2"].nines
 ```
 
+## The validation project
+
+Every headline above is a Monte Carlo result, and a Monte Carlo result
+that only holds at one seed is a coincidence with a README. The
+[validation registry](validation.py) re-runs each finding across **eight
+independent seeds** (none of them the repo's default) at the 2,000-year
+horizon the study's own seed-spread table uses, and requires it to hold
+in *all* of them.
+
+**Calibrated** — the three numbers a published source can settle. With
+the storm process switched off, the grid inputs yield **1.95 interruption
+hours** per customer-year against EIA's ~2 h routine component for 2024
+[12]; the rubidium/OCXO holdover constants are the vendor's recommended
+budget rows, used verbatim [13]; the single-fiber site lands at **2.70
+nines** (2.68–2.72 across seeds), pinned to ±0.01 — about two standard
+errors, fixed in advance rather than widened until the run fit inside it
+[1, 2].
+
+**Emergent** — findings the model was not tuned to produce, none of them
+resting on a threshold. The three transport rungs differ from one another
+by **0.044 nines** on average, *less* than the **0.067** a single rung
+varies against its own reseeding — which is how "within simulation noise"
+gets stated without a hand-picked number. Every transport rung beats the
+best single-fiber run. The generator rung buys **more than the best
+transport rung bought over a single fiber, in every seed** — an ordering,
+not a margin (an earlier version asserted "≥1.0 nines", a number picked
+after seeing 1.15; it failed on reseeding, and this is the replacement).
+Bonding moves R0 by 0.014 nines against a single fiber, inside the 0.040
+that P0's own R0 moves across seeds: the class that justifies the radio
+site gains nothing measurable from the cheapest rung. R2 capacity
+retention never clears 99.9% at any transport rung.
+
+**Sanity** — the model's own inputs and statistics, claiming no evidence.
+The 11.9 h of grid interruption the storms add is pinned as what it is: a
+property of `StormConfig`, not a calibration, and every power finding
+rests on it. P4's availability is the *least* seed-stable number on the
+board (sd 0.088 nines, against a worst case of 0.033 among all four rungs
+below it) — quote it as a band, never as a point estimate.
+
+What the registry does **not** check is printed every run: the storm
+magnitude, the 6% generator start-failure rate, the 15% SRLG fraction,
+P4's absolute availability, and the 60% autonomy retention figure are all
+uncalibrated inputs, named so they cannot pass for results.
+
+Six tests in [`tests/test_validation.py`](tests/test_validation.py) break
+the simulator on purpose — delete the power chain, delete transport
+redundancy, let a satellite carry fronthaul, switch off the storms, move
+the grid inputs, double the fiber failure rates — and require the
+registry to go **red** on the point that claims to be about that
+mechanism. A registry that cannot fail is not evidence.
+
+```
+make validation   # 8 seeds x 2,000 simulated years, ~8 s
+```
+
 ## Reproduce
 
 ```
-make test        # 24 invariant tests: eligibility, monotonicity, findings
+make test        # the registry, then 41 tests: eligibility, monotonicity,
+                 # findings, and the negative controls above
 make figures     # regenerates figures/ (needs matplotlib)
 ```
 

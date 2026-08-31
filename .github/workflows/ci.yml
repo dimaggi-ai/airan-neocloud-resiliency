@@ -18,6 +18,8 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Run tests
         run: python -m unittest discover -s tests -v
+      - name: Validation registry (public outage stats + multi-seed Monte Carlo)
+        run: python validation.py
       - name: CLI smoke
         run: |
           python -m resiliency.cli ladder --years 50

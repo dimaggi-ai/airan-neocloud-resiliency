@@ -1,7 +1,10 @@
-.PHONY: test ladder transports figures install
+.PHONY: test ladder transports figures install validation
 
-test:
+test: validation
 	python3 -m unittest discover -s tests -v
+
+validation:
+	python3 validation.py
 
 ladder:
 	python3 -m resiliency.cli ladder --years 2000
