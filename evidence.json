@@ -1,0 +1,268 @@
+{
+  "schema_version": "dimaggi-evidence/v1",
+  "coverage_scope": "Consequential headline claims, governing assumptions and model limits. Not a catalog of helper constants or proof that citations are correct.",
+  "sources": {
+    "resiliency/site.py": {
+      "source_type": "model-assumption",
+      "location": "resiliency/site.py",
+      "version_date": "2026-09-10 closure working tree; SHA-256 bound below",
+      "license_or_reuse": "Repository-authored analysis; third-party facts referenced, no new external raw data redistributed",
+      "scope": "Local authoritative definition or claim. External provenance retained in SOURCES/REFERENCES and inline citations; scenario choices are not empirical measurements."
+    },
+    "resiliency/transports.py": {
+      "source_type": "model-assumption",
+      "location": "resiliency/transports.py",
+      "version_date": "2026-09-10 closure working tree; SHA-256 bound below",
+      "license_or_reuse": "Repository-authored analysis; third-party facts referenced, no new external raw data redistributed",
+      "scope": "Local authoritative definition or claim. External provenance retained in SOURCES/REFERENCES and inline citations; scenario choices are not empirical measurements."
+    },
+    "resiliency/policies.py": {
+      "source_type": "model-assumption",
+      "location": "resiliency/policies.py",
+      "version_date": "2026-09-10 closure working tree; SHA-256 bound below",
+      "license_or_reuse": "Repository-authored analysis; third-party facts referenced, no new external raw data redistributed",
+      "scope": "Local authoritative definition or claim. External provenance retained in SOURCES/REFERENCES and inline citations; scenario choices are not empirical measurements."
+    },
+    "validation.py": {
+      "source_type": "model-assumption",
+      "location": "validation.py",
+      "version_date": "2026-09-10 closure working tree; SHA-256 bound below",
+      "license_or_reuse": "Repository-authored analysis; third-party facts referenced, no new external raw data redistributed",
+      "scope": "Local authoritative definition or claim. External provenance retained in SOURCES/REFERENCES and inline citations; scenario choices are not empirical measurements."
+    },
+    "REFERENCES.md": {
+      "source_type": "model-assumption",
+      "location": "REFERENCES.md",
+      "version_date": "2026-09-10 closure working tree; SHA-256 bound below",
+      "license_or_reuse": "Repository-authored analysis; third-party facts referenced, no new external raw data redistributed",
+      "scope": "Local authoritative definition or claim. External provenance retained in SOURCES/REFERENCES and inline citations; scenario choices are not empirical measurements."
+    },
+    "README.md": {
+      "source_type": "model-assumption",
+      "location": "README.md",
+      "version_date": "2026-09-10 closure working tree; SHA-256 bound below",
+      "license_or_reuse": "Repository-authored analysis; third-party facts referenced, no new external raw data redistributed",
+      "scope": "Local authoritative definition or claim. External provenance retained in SOURCES/REFERENCES and inline citations; scenario choices are not empirical measurements."
+    }
+  },
+  "inputs": [
+    {
+      "name": "storm rate",
+      "unit": "events/year",
+      "evidence_class": "scenario",
+      "sources": [
+        "validation.py"
+      ],
+      "transformation": "Planning storm process, not calibrated national statistics",
+      "uncertainty": "Deliberately hypothetical/operator policy; not an observed universal bound",
+      "affected_outputs": [
+        "published conclusion",
+        "README.md"
+      ],
+      "value": 0.8,
+      "valid_bounds": [
+        0,
+        80
+      ]
+    },
+    {
+      "name": "storm duration",
+      "unit": "hours",
+      "evidence_class": "scenario",
+      "sources": [
+        "validation.py"
+      ],
+      "transformation": "Exponential mean assumed",
+      "uncertainty": "Deliberately hypothetical/operator policy; not an observed universal bound",
+      "affected_outputs": [
+        "published conclusion",
+        "README.md"
+      ],
+      "value": 24,
+      "valid_bounds": [
+        0,
+        2400
+      ]
+    },
+    {
+      "name": "storm grid loss probability",
+      "unit": "fraction",
+      "evidence_class": "scenario",
+      "sources": [
+        "validation.py"
+      ],
+      "transformation": "Common-cause planning probability",
+      "uncertainty": "Deliberately hypothetical/operator policy; not an observed universal bound",
+      "affected_outputs": [
+        "published conclusion",
+        "README.md"
+      ],
+      "value": 0.7,
+      "valid_bounds": [
+        0,
+        1
+      ]
+    },
+    {
+      "name": "routine grid downtime",
+      "unit": "hours/year",
+      "evidence_class": "calibrated",
+      "sources": [
+        "validation.py"
+      ],
+      "transformation": "EIA routine component only, excluding storm addition",
+      "uncertainty": "Scope and qualifications stated in transformation and linked source; no unreported confidence interval",
+      "affected_outputs": [
+        "published conclusion",
+        "README.md"
+      ],
+      "value": 2,
+      "valid_bounds": [
+        0,
+        200
+      ]
+    },
+    {
+      "name": "bonding cost",
+      "unit": "USD/month",
+      "evidence_class": "scenario",
+      "sources": [
+        "README.md"
+      ],
+      "transformation": "Illustrative policy comparison price",
+      "uncertainty": "Deliberately hypothetical/operator policy; not an observed universal bound",
+      "affected_outputs": [
+        "published conclusion",
+        "README.md"
+      ],
+      "value": 400,
+      "valid_bounds": [
+        0,
+        40000
+      ]
+    },
+    {
+      "name": "rubidium holdover",
+      "unit": "hours",
+      "evidence_class": "calibrated",
+      "sources": [
+        "README.md"
+      ],
+      "transformation": "Published-class holdover anchor, not site measurement",
+      "uncertainty": "Scope and qualifications stated in transformation and linked source; no unreported confidence interval",
+      "affected_outputs": [
+        "published conclusion",
+        "README.md"
+      ],
+      "value": 36,
+      "valid_bounds": [
+        0,
+        3600
+      ]
+    }
+  ],
+  "results": [
+    {
+      "name": "single-fiber availability",
+      "unit": "nines",
+      "evidence_class": "simulated",
+      "sources": [
+        "README.md"
+      ],
+      "transformation": "Synthetic site, about 17 tenant downtime hours/year",
+      "uncertainty": "Conditional model result; not production outcome or empirical confidence interval",
+      "affected_outputs": [
+        "published conclusion",
+        "README.md"
+      ],
+      "value": 2.7,
+      "valid_bounds": [
+        0,
+        270
+      ]
+    },
+    {
+      "name": "transport wall",
+      "unit": "nines",
+      "evidence_class": "simulated",
+      "sources": [
+        "README.md"
+      ],
+      "transformation": "Conditional on battery, grid and storm assumptions",
+      "uncertainty": "Conditional model result; not production outcome or empirical confidence interval",
+      "affected_outputs": [
+        "published conclusion",
+        "README.md"
+      ],
+      "value": 3,
+      "valid_bounds": [
+        0,
+        300
+      ]
+    },
+    {
+      "name": "generator rung",
+      "unit": "nines",
+      "evidence_class": "simulated",
+      "sources": [
+        "README.md"
+      ],
+      "transformation": "Rare-event tail uncertain; not carrier-grade certification",
+      "uncertainty": "Conditional model result; not production outcome or empirical confidence interval",
+      "affected_outputs": [
+        "published conclusion",
+        "README.md"
+      ],
+      "value": 4.2,
+      "valid_bounds": [
+        0,
+        420
+      ]
+    },
+    {
+      "name": "capacity retention",
+      "unit": "fraction",
+      "evidence_class": "simulated",
+      "sources": [
+        "README.md"
+      ],
+      "transformation": "P4 scenario capacity-weighted metric, not availability",
+      "uncertainty": "Conditional model result; not production outcome or empirical confidence interval",
+      "affected_outputs": [
+        "published conclusion",
+        "README.md"
+      ],
+      "value": 0.9988,
+      "valid_bounds": [
+        0,
+        1
+      ]
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "resiliency/site.py",
+      "sha256": "8864f05d13a99b18d55cd26f615470b6089866557bce7526975fd84407883a9d"
+    },
+    {
+      "path": "resiliency/transports.py",
+      "sha256": "e30ac847d8b4458b7c7289ccfb4f1c1d440d1d92b3debd7707b20370f9dc8c1a"
+    },
+    {
+      "path": "resiliency/policies.py",
+      "sha256": "4d70e0e1be8ed7553fefe380641cb4fbff97f61020d3da2d03014b84d7da7793"
+    },
+    {
+      "path": "validation.py",
+      "sha256": "b7c7951980e0e5904e6041b0d06cf5592406301a169e94c1c3df8b71e62124cc"
+    },
+    {
+      "path": "REFERENCES.md",
+      "sha256": "a6a029b183dc1795f0a6f4c3849df4a3007816e54ee468a5ce835cf48eaba24d"
+    },
+    {
+      "path": "README.md",
+      "sha256": "0ea812761008cb01501ca0e36f3886b509596e0fae614e4ad70b13acf714a31e"
+    }
+  ]
+}
