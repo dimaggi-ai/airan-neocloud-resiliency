@@ -1,0 +1,18 @@
+[
+  {
+    "repo": "airan-neocloud-resiliency",
+    "label": "AI INFRASTRUCTURE RESEARCH",
+    "title": [
+      "Resilience for",
+      "AI at the edge"
+    ],
+    "subtitle": [
+      "Simulation of transport resilience,",
+      "backup power, and recovery costs."
+    ],
+    "fontSize": 58,
+    "background": "illustration-v2.png",
+    "output": ".",
+    "source_readme_commit": "db7cdf3119860aa6666bd6e4d9aee976da509baf"
+  }
+]
