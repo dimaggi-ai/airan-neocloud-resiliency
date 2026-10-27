@@ -88,6 +88,57 @@ class TestMechanics(unittest.TestCase):
                 self.assertEqual(set(result.classes), {'R0', 'R1', 'R2'})
                 self.assertEqual(ladder([policy], years=2, seed=7), [result])
 
+    def test_shared_cuts_follow_canonical_fiber_in_both_transport_orders(self):
+        from dataclasses import replace
+        from unittest.mock import patch
+        from resiliency import sim
+        from resiliency.policies import P1
+        from resiliency.site import PowerConfig, TimingConfig
+
+        for names in (('fiber', 'microwave'), ('microwave', 'fiber')):
+            for share in (0., 1.):
+                with self.subTest(transports=names, shared_cut_fraction=share):
+                    # Fixed synthetic event intervals isolate the topology rule
+                    # from random arrival order. Only the primary 10..12h cut
+                    # may propagate; its 30..34h upstream outage and the
+                    # secondary's independent 50..52h cut must stay independent.
+                    primary = sim.TransportYear(
+                        hard=[(10., 12.), (30., 34.)], soft=[], cuts=[(10., 12.)])
+                    secondary = sim.TransportYear(
+                        hard=[(50., 52.)], soft=[], cuts=[(50., 52.)])
+                    microwave = sim.TransportYear(
+                        hard=[(10., 12.), (30., 34.), (50., 52.)], soft=[], cuts=[])
+                    events = {'fiber': primary, 'fiber-b': secondary,
+                              'microwave': microwave}
+                    policy = replace(
+                        P1, transports=names, shared_cut_fraction=share,
+                        power=PowerConfig(routine_outages_per_year=0.),
+                        timing=TimingConfig(gnss_events_per_year=0.))
+                    with patch.object(sim, '_transport_year', side_effect=[
+                            events[name] for name in (*names, 'fiber-b')]) as arrivals:
+                        result = sim.simulate(
+                            policy, years=1, seed=7,
+                            storm=sim.StormConfig(rate_per_year=0.))
+                    self.assertEqual(arrivals.call_count, 3)
+                    # Microwave is unavailable during each fixture outage.
+                    # The two fiber paths overlap only on the shared primary
+                    # cut: exactly two hours at share=1, none at share=0.
+                    expected_down = 2. if share else 0.
+                    for name in ('R0', 'R1', 'R2'):
+                        self.assertEqual(result.classes[name].downtime_h_yr,
+                                         expected_down)
+                        self.assertEqual(result.classes[name].availability,
+                                         1. - expected_down / HOURS)
+                    expected_secondary = ([(10., 12.), (50., 52.)]
+                                          if share else [(50., 52.)])
+                    self.assertEqual(secondary.hard, expected_secondary)
+                    self.assertEqual(secondary.cuts, expected_secondary)
+                    self.assertEqual(primary.hard, [(10., 12.), (30., 34.)])
+                    self.assertEqual(primary.cuts, [(10., 12.)])
+                    self.assertEqual(microwave.hard,
+                                     [(10., 12.), (30., 34.), (50., 52.)])
+                    self.assertEqual(microwave.cuts, [])
+
     def test_dual_fiber_requires_canonical_primary(self):
         from dataclasses import replace
         from unittest.mock import patch
