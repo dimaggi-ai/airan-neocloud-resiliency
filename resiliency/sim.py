@@ -231,6 +231,11 @@ def _timing_down(rng, cfg) -> list[Interval]:
 
 def _policy_transports(p: Policy) -> list[tuple[str, Transport]]:
     """(instance-name, transport) pairs; dual fiber = two instances."""
+    if p.dual_fiber and "fiber" not in p.transports:
+        raise ValueError(
+            "dual_fiber=True requires the canonical primary 'fiber' in "
+            "Policy.transports; include 'fiber', or use dual_fiber=False "
+            "for a renamed custom single transport")
     out = [(n, transport(n)) for n in p.transports]
     if p.dual_fiber:
         out.append(("fiber-b", transport("fiber")))

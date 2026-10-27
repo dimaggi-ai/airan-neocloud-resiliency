@@ -40,6 +40,47 @@ class TestIntervals(unittest.TestCase):
 
 
 class TestMechanics(unittest.TestCase):
+    def test_dual_fiber_requires_canonical_primary(self):
+        from dataclasses import replace
+        from unittest.mock import patch
+        from resiliency.policies import P1
+        from resiliency.sim import simulate
+        from resiliency.transports import CATALOG, custom
+        with patch.dict(CATALOG, {'renamed-fiber': custom('fiber', name='renamed-fiber')}):
+            for names in (('renamed-fiber',), ('microwave',), ()):
+                with self.subTest(transports=names):
+                    with self.assertRaisesRegex(ValueError, "dual_fiber=True requires.*'fiber'"):
+                        simulate(replace(P1, transports=names), years=1, seed=7)
+
+    def test_custom_single_and_canonical_dual_recover_after_refusal(self):
+        from dataclasses import replace
+        from unittest.mock import patch
+        from resiliency.policies import P0, P1
+        from resiliency.sim import simulate
+        from resiliency.transports import CATALOG, custom
+        expected_single = simulate(P0, years=50, seed=7)
+        expected_dual = simulate(P1, years=50, seed=7)
+        with patch.dict(CATALOG, {'renamed-fiber': custom('fiber', name='renamed-fiber')}):
+            unsupported = replace(P1, transports=('renamed-fiber',))
+            with self.assertRaises(ValueError):
+                simulate(unsupported, years=50, seed=7)
+            single = replace(P0, transports=('renamed-fiber',))
+            self.assertEqual(simulate(single, years=50, seed=7), expected_single)
+            corrected = replace(unsupported, transports=('fiber',))
+            self.assertEqual(simulate(corrected, years=50, seed=7), expected_dual)
+
+    def test_dual_fiber_duplicate_instances_still_refuse(self):
+        from dataclasses import replace
+        from unittest.mock import patch
+        from resiliency.policies import P1
+        from resiliency.sim import simulate
+        from resiliency.transports import CATALOG, custom
+        with patch.dict(CATALOG, {'fiber-b': custom('fiber', name='fiber-b')}):
+            for names in (('fiber', 'fiber'), ('fiber', 'fiber-b')):
+                with self.subTest(transports=names):
+                    with self.assertRaisesRegex(ValueError, 'duplicate transport instance'):
+                        simulate(replace(P1, transports=names), years=1, seed=7)
+
     def test_deterministic_for_seed(self):
         from resiliency.policies import P0
         from resiliency.sim import simulate

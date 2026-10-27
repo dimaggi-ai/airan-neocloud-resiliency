@@ -19,6 +19,8 @@ class Policy:
     transports: tuple[str, ...]       # names into transports.CATALOG
     power: PowerConfig
     timing: TimingConfig
+    # Requires canonical 'fiber' in transports; the simulator adds
+    # 'fiber-b'. Renamed custom single links use dual_fiber=False.
     dual_fiber: bool = False
     # Fraction of physical fiber CUTS (not upstream/equipment events)
     # that hit both 'diverse' paths anyway (shared duct, same bridge
