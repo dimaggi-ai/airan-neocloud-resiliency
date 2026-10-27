@@ -109,8 +109,9 @@ The simulator (`resiliency/sim.py`) injects, per simulated year:
   shared duct, same bridge crossing, same backhoe. The fraction is a
   planning assumption; audit your own duct maps.
   In the Python API, `dual_fiber=True` requires the canonical primary
-  `"fiber"` in `Policy.transports`; the simulator adds `"fiber-b"` and
-  raises `ValueError` if the primary is missing. Renamed `custom()`
+  `"fiber"` in `Policy.transports`; the simulator adds `"fiber-b"`.
+  Direct `Policy.monthly_usd()` pricing and simulation both raise `ValueError`
+  if the primary is missing. Renamed `custom()`
   transports remain supported as single links with `dual_fiber=False`.
   Shared cuts propagate from the primary to the secondary only; this
   model does not implement symmetric shared-risk propagation.

@@ -40,6 +40,43 @@ class TestIntervals(unittest.TestCase):
 
 
 class TestMechanics(unittest.TestCase):
+    def test_direct_quote_shares_dual_fiber_refusal_with_simulation(self):
+        from dataclasses import replace
+        from unittest.mock import patch
+        from resiliency.policies import P1
+        from resiliency.sim import _policy_transports, ladder, simulate
+        from resiliency.transports import CATALOG, custom
+        with patch.dict(CATALOG, {'renamed-fiber': custom('fiber', name='renamed-fiber')}):
+            for names in (('renamed-fiber',), ('microwave',), ()):
+                p = replace(P1, transports=names)
+                messages = []
+                for entry in (p.monthly_usd, lambda: _policy_transports(p),
+                              lambda: simulate(p, years=1, seed=7),
+                              lambda: ladder([p], years=1, seed=7)):
+                    with self.subTest(transports=names, entry=entry):
+                        with self.assertRaisesRegex(ValueError, "dual_fiber=True requires.*'fiber'") as error:
+                            entry()
+                        messages.append(str(error.exception))
+                self.assertEqual(len(set(messages)), 1)
+
+    def test_quotes_preserve_valid_prices_and_recover_after_refusal(self):
+        from dataclasses import replace
+        from unittest.mock import patch
+        from resiliency.policies import LADDER, P0, P1
+        from resiliency.transports import CATALOG, custom
+        self.assertEqual({p.name: p.monthly_usd() for p in LADDER},
+                         {'P0': 1660., 'P1': 3160., 'P2': 2460.,
+                          'P3': 2060., 'P4': 3780.})
+        with patch.dict(CATALOG, {'renamed-fiber': custom('fiber', name='renamed-fiber')}):
+            invalid = replace(P1, transports=('renamed-fiber',))
+            with self.assertRaises(ValueError):
+                invalid.monthly_usd()
+            self.assertEqual(replace(invalid, dual_fiber=False).monthly_usd(), 1660.)
+            self.assertEqual(replace(invalid, transports=('fiber',)).monthly_usd(), 3160.)
+            self.assertEqual(replace(P0, transports=('renamed-fiber',)).monthly_usd(), 1660.)
+        for names in (('fiber', 'microwave'), ('microwave', 'fiber')):
+            self.assertEqual(replace(P1, transports=names).monthly_usd(), 3960.)
+
     def test_dual_fiber_accepts_canonical_fiber_in_either_transport_order(self):
         from dataclasses import replace
         from resiliency.policies import P1
