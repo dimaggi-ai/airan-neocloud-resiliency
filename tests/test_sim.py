@@ -40,6 +40,17 @@ class TestIntervals(unittest.TestCase):
 
 
 class TestMechanics(unittest.TestCase):
+    def test_dual_fiber_accepts_canonical_fiber_in_either_transport_order(self):
+        from dataclasses import replace
+        from resiliency.policies import P1
+        from resiliency.sim import ladder, simulate
+        for names in (('fiber', 'microwave'), ('microwave', 'fiber')):
+            with self.subTest(transports=names):
+                policy = replace(P1, transports=names)
+                result = simulate(policy, years=2, seed=7)
+                self.assertEqual(set(result.classes), {'R0', 'R1', 'R2'})
+                self.assertEqual(ladder([policy], years=2, seed=7), [result])
+
     def test_dual_fiber_requires_canonical_primary(self):
         from dataclasses import replace
         from unittest.mock import patch
