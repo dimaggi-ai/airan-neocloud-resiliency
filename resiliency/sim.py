@@ -231,6 +231,7 @@ def _timing_down(rng, cfg) -> list[Interval]:
 
 def _policy_transports(p: Policy) -> list[tuple[str, Transport]]:
     """(instance-name, transport) pairs; dual fiber = two instances."""
+    p._validate_dual_fiber()
     out = [(n, transport(n)) for n in p.transports]
     if p.dual_fiber:
         out.append(("fiber-b", transport("fiber")))

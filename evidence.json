@@ -19,9 +19,9 @@
     "resiliency/policies.py": {
       "source_type": "model-assumption",
       "location": "resiliency/policies.py",
-      "version_date": "2026-09-10 closure working tree; SHA-256 bound below",
+      "version_date": "2026-10-27 UTC current-source revision; shared dual-fiber pricing refusal; SHA-256 bound below",
       "license_or_reuse": "Repository-authored analysis; third-party facts referenced, no new external raw data redistributed",
-      "scope": "Local authoritative definition or claim. External provenance retained in SOURCES/REFERENCES and inline citations; scenario choices are not empirical measurements."
+      "scope": "Local authoritative definition or claim. External provenance retained in SOURCES/REFERENCES and inline citations; scenario choices are not empirical measurements. This entry now binds current source, not the historical producer of retained README results. Historical policy bytes SHA-256 4d70e0e1be8ed7553fefe380641cb4fbff97f61020d3da2d03014b84d7da7793 were first committed at 380e7cd and bound by 13349ea on 2026-09-10; they remain available in Git. The shared refusal preserves valid prices and 18 matched seeded full simulation outputs. README claims and all result entries are unchanged."
     },
     "validation.py": {
       "source_type": "model-assumption",
@@ -250,7 +250,7 @@
     },
     {
       "path": "resiliency/policies.py",
-      "sha256": "4d70e0e1be8ed7553fefe380641cb4fbff97f61020d3da2d03014b84d7da7793"
+      "sha256": "1d4b300bcaf9b6f84f0bb31c838525305c7b3ff877738eda85102ca82503d656"
     },
     {
       "path": "validation.py",

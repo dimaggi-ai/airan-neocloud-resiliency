@@ -29,7 +29,15 @@ class Policy:
     # RAG index, store-and-forward telemetry).
     local_autonomy: bool = False
 
+    def _validate_dual_fiber(self) -> None:
+        if self.dual_fiber and "fiber" not in self.transports:
+            raise ValueError(
+                "dual_fiber=True requires the canonical primary 'fiber' in "
+                "Policy.transports; include 'fiber', or use dual_fiber=False "
+                "for a renamed custom single transport")
+
     def monthly_usd(self) -> float:
+        self._validate_dual_fiber()
         cost = sum(transport(n).monthly_usd for n in self.transports)
         if self.dual_fiber:
             cost += transport("fiber").monthly_usd
