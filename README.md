@@ -120,3 +120,7 @@ Python 3.10+, stdlib only; `matplotlib` only for figures. The findings the study
 ---
 
 *Margaret (Maggie) Nanyonga — Founder & Principal Architect, [DIMAGGI AI](https://dimaggi.ai). Governed AI infrastructure: the control, reliability, and audit layer for autonomous systems operating production networks and compute.*
+
+### Poisson sampler input and execution contract
+
+The event-count sampler accepts ordinary Python int/float rates (excluding bool), finite and nonnegative. Zero consumes no RNG draws. Rates at most 300 retain the historical Knuth draw sequence; larger supported rates sum independent Poisson chunks of at most 300, using Poisson additivity rather than a Gaussian approximation or clipped count. Floating-point and pseudorandom sampling limitations remain. Per sampler call, conservative execution guards allow at most 100,000 expected events, 1,000,000 RNG draws and 1,000,000 returned events. Unsupported input or budget exhaustion raises `ValueError` without a partial count or silent retry; an exhausted call may already have advanced RNG state. These are computational safeguards, not hardware, physical arrival-rate, availability or SLO limits, and do not bound the total simulation across all years/processes. Refusal must not be silently retried or interpreted as zero failures. Other parameter validation and zero-observed-downtime reporting remain outside this correction.

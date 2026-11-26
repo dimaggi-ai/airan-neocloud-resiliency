@@ -25,6 +25,7 @@ Semantics per resilience class (see classes.py):
 """
 
 import random
+import math
 from dataclasses import dataclass, field
 
 from .classes import CLASSES, ResilienceClass
@@ -132,16 +133,47 @@ def _poisson_starts(rng, rate: float) -> list[float]:
     return [rng.uniform(0.0, HOURS) for _ in range(n)]
 
 
+# Conservative per-call execution limits, not physical rate or SLO limits.
+_MAX_POISSON_RATE = 100_000
+_MAX_POISSON_DRAWS = 1_000_000
+_MAX_POISSON_EVENTS = 1_000_000
+
+
 def _poisson(rng, lam: float) -> int:
-    # Knuth; lam is small (<300) everywhere in this model.
-    if lam <= 0:
+    """Sum independent small-rate Poisson counts without product underflow.
+
+    Preserve Knuth's historical draw sequence at rates <= 300. Budget refusal
+    returns no partial count and is never retried or replaced by an approximation.
+    """
+    if type(lam) not in (int, float):
+        raise ValueError("lam must be an ordinary int or float, excluding bool")
+    try:
+        valid = math.isfinite(lam)
+    except OverflowError:
+        valid = False
+    if not valid or lam < 0:
+        raise ValueError("lam must be finite and non-negative")
+    if lam > _MAX_POISSON_RATE:
+        raise ValueError("lam exceeds the Poisson execution rate budget")
+    if lam == 0:
         return 0
-    l, k, p = pow(2.718281828459045, -lam), 0, 1.0
-    while True:
-        p *= rng.random()
-        if p <= l:
-            return k
-        k += 1
+    remaining, total, draws = lam, 0, 0
+    while remaining > 0:
+        chunk = min(remaining, 300)
+        threshold, k, product = pow(2.718281828459045, -chunk), 0, 1.0
+        while True:
+            if draws >= _MAX_POISSON_DRAWS:
+                raise ValueError("Poisson RNG draw budget exhausted")
+            product *= rng.random()
+            draws += 1
+            if product <= threshold:
+                break
+            k += 1
+            if total + k > _MAX_POISSON_EVENTS:
+                raise ValueError("Poisson event budget exhausted")
+        total += k
+        remaining -= chunk
+    return total
 
 
 def _in_storm(t: float, storms: list[Interval]) -> bool:
