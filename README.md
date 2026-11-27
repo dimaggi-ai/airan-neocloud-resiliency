@@ -110,6 +110,14 @@ make figures     # regenerates figures/ (needs matplotlib)
 
 Python 3.10+, stdlib only; `matplotlib` only for figures. The findings the study reports are asserted as test invariants — they must *fall out* of the simulation, not be asserted by it.
 
+## Poisson sampler input and execution contract
+
+The event-count sampler accepts ordinary Python int/float rates (excluding bool and numeric subclasses), finite and nonnegative. Zero, including negative zero, consumes no RNG draws. Rates at most 300 retain the historical Knuth draw sequence; larger supported rates sum independent Poisson chunks of at most 300, using Poisson additivity rather than a Gaussian approximation or clipped count. Floating-point and pseudorandom sampling limitations remain.
+
+Per sampler call, conservative execution guards allow at most 100,000 expected events, 1,000,000 sampler RNG draws and 1,000,000 returned events. The draw budget counts only `_poisson` sampling draws: `_poisson_starts` subsequently makes one additional uniform placement draw per returned event. At the default equal draw/event limits, the draw guard fires before the event guard because every event requires a sampler draw. The cumulative event guard also applies across chunks if its limit is lowered.
+
+Unsupported input or budget exhaustion raises `ValueError` with a reason in the message, without a partial count or silent retry; an exhausted call may already have advanced RNG state. There is no separate budget-exhaustion exception class. These are computational safeguards, not hardware, physical arrival-rate, availability or SLO limits, and do not bound the total simulation across all years/processes. Refusal must not be silently retried or interpreted as zero failures. Other parameter validation and zero-observed-downtime reporting remain outside this correction.
+
 ## Series — turning GPU capital into usable compute
 
 - **GPU Cluster Networking** ([network-vs-more-gpus](https://github.com/dimaggi-ai/network-vs-more-gpus)) · **GPU Cluster Scheduling** ([scheduler-vs-more-gpus](https://github.com/dimaggi-ai/scheduler-vs-more-gpus))
