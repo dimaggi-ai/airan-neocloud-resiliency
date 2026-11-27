@@ -133,7 +133,10 @@ def _poisson_starts(rng, rate: float) -> list[float]:
     return [rng.uniform(0.0, HOURS) for _ in range(n)]
 
 
-# Conservative per-call execution limits, not physical rate or SLO limits.
+# Conservative per-sampler-call execution limits, not physical rate or SLO limits.
+# Draws here exclude the later arrival-placement draws in _poisson_starts.
+# At these equal draw/event limits the draw guard fires first: each event costs
+# a sampler draw. The event guard also enforces cumulative counts if lowered.
 _MAX_POISSON_RATE = 100_000
 _MAX_POISSON_DRAWS = 1_000_000
 _MAX_POISSON_EVENTS = 1_000_000

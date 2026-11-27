@@ -1,4 +1,6 @@
 """Poisson distribution, stream compatibility and bounded refusal regressions."""
+from decimal import Decimal
+from fractions import Fraction
 import math
 import random
 import statistics
@@ -24,6 +26,14 @@ class CountingRng:
     def random(self):
         self.calls += 1
         return self.value
+
+
+class IntSubclass(int):
+    pass
+
+
+class FloatSubclass(float):
+    pass
 
 
 class PoissonTests(unittest.TestCase):
@@ -63,13 +73,45 @@ class PoissonTests(unittest.TestCase):
             self.assertTrue(all(type(x) is int and x >= 0 for x in samples))
 
     def test_invalid_rate_refusal_without_rng_use_and_recovery(self):
-        for value in (math.nan, math.inf, -math.inf, -1, True, False, '1', None, 1j, 10**400, 100001):
+        for value in (math.nan, math.inf, -math.inf, -1, True, False, '1', None, 1j,
+                      10**400, 100001, IntSubclass(1), FloatSubclass(1),
+                      Decimal('1'), Fraction(1), -5e-324,
+                      math.nextafter(100000., math.inf)):
             rng = CountingRng(0.)
             with self.subTest(value=repr(value)):
                 with self.assertRaisesRegex(ValueError, 'lam'):
                     sim._poisson(rng, value)
                 self.assertEqual(rng.calls, 0)
         self.assertEqual(sim._poisson(random.Random(4), 200), old_knuth(random.Random(4), 200))
+
+    def test_signed_zero_consumes_no_draws(self):
+        for rate in (0.0, -0.0):
+            with self.subTest(rate=repr(rate)):
+                rng = CountingRng(1.)
+                self.assertEqual(sim._poisson(rng, rate), 0)
+                self.assertEqual(rng.calls, 0)
+
+    def test_cumulative_event_budget_across_chunks(self):
+        # Chunk one yields one event, chunk two would yield two. Neither
+        # chunk alone exceeds two, but their sum must refuse without a count.
+        class SequenceRng:
+            def __init__(self):
+                self.values = iter((1., 0., 1., 1., 0.))
+                self.calls = 0
+            def random(self):
+                self.calls += 1
+                return next(self.values)
+
+        with patch.object(sim, '_MAX_POISSON_EVENTS', 2):
+            rng = SequenceRng()
+            with self.assertRaisesRegex(ValueError, 'event budget'):
+                sim._poisson(rng, 600)
+            self.assertEqual(rng.calls, 4)
+        # At the cumulative equality boundary all three events are returned.
+        with patch.object(sim, '_MAX_POISSON_EVENTS', 3):
+            rng = SequenceRng()
+            self.assertEqual(sim._poisson(rng, 600), 3)
+            self.assertEqual(rng.calls, 5)
 
     def test_draw_budget_exhaustion_and_exact_boundary(self):
         with patch.object(sim, '_MAX_POISSON_DRAWS', 3):
